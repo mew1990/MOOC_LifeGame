@@ -23,13 +23,14 @@ class GameMap(object):
     MIN_CELL_VALUE = 0
     DIRECTIONS = (
         (0, 1, ),
-        (1, -1, ),
+        (0, 2, ),
+        (0, -1, ),
+        (0, -2, ),
+        (1, 0, ),
+        (2, 0, ),
         (-1, 0, ),
-        (1, -1, ),
-        (-1, -1, ),
-        (-1, 0, ),
-        (-1, -1, ),
-    )
+        (-2, 0, ),
+    )  # modified DIRECTIONS: Extended von Neumann Neighborhood
 
     def __init__(self, rows, cols):
         """Inits GameMap with row and column count."""
@@ -42,11 +43,11 @@ class GameMap(object):
 
     @property
     def rows(self):
-        return self.size[1]
+        return self.size[0]  # modified index 1 --> 0
 
     @property
     def cols(self):
-        return self.size[0]
+        return self.size[1]  # modified index 0 --> 1
 
     def reset(self, possibility_live=0.5, possibility_wall=0.1):
         """Reset the map with random data.
@@ -57,12 +58,20 @@ class GameMap(object):
         """
         for row in self.cells:
             for col_num in range(self.cols):
-                row[col_num] = 1 if random.random() < possibility_live else 0
+                if random.random() < possibility_wall:
+                    row[col_num] = -1  # modified wall initialization
+                    # attention! wall messages are stored in cells
+                else:
+                    row[col_num] = 1 if random.random() < possibility_live else 0
 
     def set(self, row, col, val):
         """Set specific cell in the map."""
         assert self.MIN_CELL_VALUE <= val <= self.MAX_CELL_VALUE
-        self.cells[col][row] = val
+        # if val == -1, means wall exists, raises AssertionError
+        # but in this case, this function is invoked in life_game.py , so if the cell
+        # is a wall, it will still be invoked, so I modified the get_neighbor_count(),
+        # another way is to judge whether the original val is -1, before assert()
+        self.cells[row][col] = val  # a slight mistake! index error
         return self
 
     def get_neighbor_count(self, row, col):
@@ -75,6 +84,10 @@ class GameMap(object):
         Returns:
             Count of live neighbor cells
         """
+        # see the comments in set()
+        # if the cell_value is -1, then return 2(to avoid invoke set() in life_game.py)
+        if self.cells[row][col] == -1:
+            return 2
         count = 0
         for d in self.DIRECTIONS:
             d_row = row + d[0]
@@ -83,7 +96,8 @@ class GameMap(object):
                 d_row -= self.rows
             if d_col >= self.cols:
                 d_col -= self.cols
-            count += self.cells[d_col][d_row]
+            # if cells[d_col][d_row] == -1 , means wall exists, so count += 0
+            count += max(0, self.cells[d_row][d_col])  # a slight mistake! index error
         return count
 
     def get_neighbor_count_map(self):
